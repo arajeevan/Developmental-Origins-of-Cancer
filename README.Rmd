@@ -1,0 +1,122 @@
+---
+title: "Gene Groups from RNA-Seq Read Counts Pipeline"
+author: "Arati Rajeevan"
+date: "2/9/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+
+```
+
+## Get Kallisto Read Count Files for developmental stages and cancer
+
+After downloading the BAM files from Array Express <https://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-6814/> we used the program, Kallisto, to convert the files to transcript-level read counts. We downloaded human RNA-seq data in liver, kidney, forebrain, hindbrain, ovary, and testis for the following developmental and adult normal stages:
+
+(CombineKallistoSamples.R)
+
+```{r load stage info, include=FALSE}
+sampleTable <- read.table("~/Developmental-Origins-of-Cancer/data/SampleTable.tsv", sep="\t", header=TRUE)
+sampleTable <- sampleTable[order(sampleTable$days),]
+
+sampleTable$stages <- paste(sampleTable$stageCount, sampleTable$stageUnit, sep=" ")
+stages <- sampleTable$stages %>% unique
+
+```
+
+```{r all stages, echo=FALSE}
+print(stages)
+```
+
+We also obtained cancer and adult normal RNAseq data from TCGA and GTex and used Kallisto to generate transcript-level counts.
+
+## Plot PCA of All Samples With Top 1000 DE Genes and Get Sample Distances
+
+
+Using the Ensembl transcript ID to gene ID mappings, we calculated gene-level read counts for all fetal, adult, and cancer samples (CombineKallistoSamples.R). We used DESeq2 to calculate log2 fold changes between fetal and adult and between adult and cancer samples (GetLogFC.R). Below are the PCA plots for liver analyzed and the top 1000 most differentially expressed genes:
+(StagesPCADistancePlots.R)
+(GetLogFC.R)
+
+![](Plots/LiverDevStagePCA.png)
+We calculated the distance between all the fetal samples and every adult and cancer sample in 50-PC space to determine if fetal samples cluster closer to cancer samples than adult samples. We expect the Fetal-Cancer samples to have a smaller distance between them than the Fetal-Adult samples, which we see in the boxplots below for all five tissues analyzed.
+
+![](Plots/LiverFetalSampleDistancesBoxplot.png)
+![](Plots/KidneyFetalSampleDistancesBoxplot.png)
+![](Plots/BrainFetalSampleDistancesBoxplot.png)
+![](Plots/OvaryFetalSampleDistancesBoxplot.png)
+![](Plots/TestisFetalSampleDistancesBoxplot.png)
+
+We also calculated the distances between fetal samples and cancer samples separated by tumor stage (early or late). We found that fetal samples cluster more closely to late stage tumors for two out of three tissues where tumor stage information was available. 
+
+![](Plots/LiverSampleDistancesBoxplotEarlyLateStage.png)
+![](Plots/KidneySampleDistancesBoxplotEarlyLateStage.png)
+![](Plots/TestisSampleDistancesBoxplotEarlyLateStage.png)
+
+## Calculate Log Likelihood Ratio
+
+
+Our hypothesis is that the gene expression patterns of cancer samples mimic those of fetal samples, so we expect the same genes that are activated in cancer to have been active in fetal. We calculated the likelihood that cancer expression can be predicted by fetal expression patterns using a log likelihood ratio. We used a binomial generalized linear model to calculate the likelihood of cancer expression (UP or DOWN from adult) using either just fetal expression, just adult expression, or both. We then take the ratio to determine if adding fetal expression improves the likelihood. In the table below, we see that the log likelihood ratio is significant for all five tissues. 
+(LogLikelihoodRatio.R)
+
+```{r, echo=FALSE}
+logLikDf <- read.table("AnalyzedData/AllTissuesLogLikRatio.tsv")
+print(logLikDf)
+
+# add baseline coefficient
+```
+
+## Generate Gene Groups for Analysis
+
+To analyze the behavior of groups of genes that may be playing critical roles in tumorigenesis, we greated gene groups based on their expression patterns from fetal to adult and from adult to cancer. From the log2 fold changes calculated using DESeq2, we labeled genes as "UP" if the log2 fold change between stages was greater than 2, and "DOWN" if the log2 fold change was less than -2. We merged the fetal to adult group and adult to cancer group to obtain four gene groups: "UPUP", "UPDOWN", "DOWNUP", "UPDOWN". 
+
+```{r, echo=FALSE}
+geneGroups <- read.table("AnalyzedData/LiverGeneGroups.tsv")
+print("Liver")
+print(table(geneGroups$group))
+
+geneGroups <- read.table("AnalyzedData/KidneyGeneGroups.tsv")
+print("Kidney")
+print(table(geneGroups$group))
+
+geneGroups <- read.table("AnalyzedData/BrainGeneGroups.tsv")
+print("Brain")
+print(table(geneGroups$group))
+
+geneGroups <- read.table("AnalyzedData/OvaryGeneGroups.tsv")
+print("Ovary")
+print(table(geneGroups$group))
+
+geneGroups <- read.table("AnalyzedData/TestisGeneGroups.tsv")
+print("Testis")
+print(table(geneGroups$group))
+```
+
+
+
+The boxplots below verify that the expression follows the labeled patterns.
+(GetGeneGroups.R)
+
+![](Plots/LiverUPUPGeneExpressionCheck.png)
+![](Plots/LiverUPDOWNGeneExpressionCheck.png)
+![](Plots/LiverDOWNUPGeneExpressionCheck.png)
+![](Plots/LiverDOWNDOWNGeneExpressionCheck.png)
+
+## Survival Analysis Hazard Ratios
+
+
+(SurvivalAnalysis.R)
+
+![](Plots/LiverHazardRatioBoxplot.png)
+![](Plots/KidneyHazardRatioBoxplot.png)
+
+
+## Identify Enriched Gene Sets in Gene Groups
+(GeneSetEnrichment.R)
+
+
+
+
+
+
